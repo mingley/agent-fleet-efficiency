@@ -54,7 +54,10 @@ image, pin, container info). Overrides: `IMAGE`, `PLATFORM` (default
 `linux/arm64` for speed; use `linux/amd64` for fleet-arch headlines),
 `N_TINY` (default `1000`), `CONCURRENT` (default `100`),
 `N_TINY_SERVER` (default `50`), `UPLOAD_MIB` (default `10`). Keep the
-host otherwise idle while the matrix runs.
+host otherwise idle while the matrix runs. Console output is tee'd to
+`matrix.log` in the run directory; resume an interrupted run with
+`MATRIX_TS=<ts> benchmarks/docker/run-matrix.sh` (completed arms are
+skipped).
 
 ## Fleet-arch note
 

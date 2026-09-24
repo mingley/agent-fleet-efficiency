@@ -28,9 +28,15 @@ unset SWEREX_OPT_REUSE_SESSION SWEREX_OPT_BOUNDED_IDEMPOTENCY SWEREX_OPT_STREAM_
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
-TS="$(date -u +%Y%m%dT%H%M%SZ)"
+# MATRIX_TS reuses an existing run directory (resume); completed arms are
+# skipped by run_arm. Full console output is tee'd to matrix.log so an
+# interrupted run keeps its diagnostics.
+TS="${MATRIX_TS:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RESULTS_DIR="benchmark-results/matrix-$TS"
 mkdir -p "$RESULTS_DIR"
+LOG="$RESULTS_DIR/matrix.log"
+exec > >(tee -a "$LOG") 2>&1
+echo "==> run $TS (log: $LOG)"
 
 SYS_PY=/usr/local/bin/python
 OPT_PY=/opt/venv-opt/bin/python
@@ -59,6 +65,10 @@ run_arm() { # arm interpreter flags... -- command...
     local arm="$1" interp="$2" flags="$3"
     shift 3
     [ "${1:-}" = "--" ] && shift
+    if [ -f "$RESULTS_DIR/$arm.jsonl" ]; then
+        echo "==> arm $arm already done, skipping"
+        return 0
+    fi
     echo "==> arm $arm ($interp flags: ${flags:-none})"
     local before after newfile
     before=$(ls "$RESULTS_DIR")
