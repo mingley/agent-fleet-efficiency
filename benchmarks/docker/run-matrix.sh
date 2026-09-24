@@ -114,7 +114,7 @@ run_arm a-opt-plain "$OPT_PY" "" -- rundock "$OPT_PY" "${A[@]}"
 ( export SWEREX_OPT_NO_FIXED_SLEEP=1
   run_arm a-opt-0003 "$OPT_PY" "NO_FIXED_SLEEP" -- rundock "$OPT_PY" "${A[@]}" )
 run_arm a-direct "$SYS_PY" "" -- \
-    rundock "$SYS_PY" python3 /opt/harness/scripts/run_workload_a.py --variant direct \
+    rundock "$SYS_PY" /opt/harness/scripts/run_workload_a.py --variant direct \
     --n-tiny "$N_TINY" --concurrent "$CONCURRENT" --out-dir "$OUT"
 
 B=(/opt/harness/scripts/run_workload_b.py --variant swerex-local --out-dir "$OUT")
