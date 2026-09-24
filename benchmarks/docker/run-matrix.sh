@@ -91,7 +91,7 @@ EOF
 echo "==> host record"
 rundock python3 /opt/harness/scripts/record_host.py --out "$OUT/host.docker.json"
 
-A=(python3 /opt/harness/scripts/run_workload_a.py --variant swerex-local
+A=(/opt/harness/scripts/run_workload_a.py --variant swerex-local
    --n-tiny "$N_TINY" --concurrent "$CONCURRENT" --out-dir "$OUT")
 run_arm a-upstream "$SYS_PY" "" -- rundock "$SYS_PY" "${A[@]}"
 run_arm a-opt-plain "$OPT_PY" "" -- rundock "$OPT_PY" "${A[@]}"
@@ -107,13 +107,13 @@ run_arm a-direct "$SYS_PY" "" -- \
     rundock "$SYS_PY" python3 /opt/harness/scripts/run_workload_a.py --variant direct \
     --n-tiny "$N_TINY" --concurrent "$CONCURRENT" --out-dir "$OUT"
 
-B=(python3 /opt/harness/scripts/run_workload_b.py --variant swerex-local --out-dir "$OUT")
+B=(/opt/harness/scripts/run_workload_b.py --variant swerex-local --out-dir "$OUT")
 run_arm b-upstream "$SYS_PY" "" -- rundock "$SYS_PY" "${B[@]}"
 run_arm b-opt-plain "$OPT_PY" "" -- rundock "$OPT_PY" "${B[@]}"
 ( export SWEREX_OPT_SKIP_SYNTAX_CHECK=1 SWEREX_OPT_SINGLE_SUBMIT=1 SWEREX_OPT_NO_FIXED_SLEEP=1
   run_arm b-opt-all "$OPT_PY" "SKIP_SYNTAX_CHECK SINGLE_SUBMIT NO_FIXED_SLEEP" -- rundock "$OPT_PY" "${B[@]}" )
 
-S=(python3 /opt/harness/scripts/run_workload_server.py
+S=(/opt/harness/scripts/run_workload_server.py
    --n-tiny "$N_TINY_SERVER" --upload-mib "$UPLOAD_MIB" --out-dir "$OUT")
 run_arm s-upstream "$SYS_PY" "" -- rundock "$SYS_PY" "${S[@]}" --server-python "$SYS_PY" --label s-upstream
 run_arm s-opt-plain "$OPT_PY" "" -- rundock "$OPT_PY" "${S[@]}" --server-python "$OPT_PY" --label s-opt-plain
