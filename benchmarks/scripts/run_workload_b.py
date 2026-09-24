@@ -244,11 +244,7 @@ async def workload_unpack(rec, ex, session, tmpdir, n_files):
         rec.ops[-1]["note"] = f"files={count}"
 
 
-async def workload_clone(rec, ex, session, tmpdir, repo_root):
-    if os.path.isdir(CLONE_SRC_CANDIDATE):
-        src = CLONE_SRC_CANDIDATE
-    else:
-        src = str(repo_root)
+async def workload_clone(rec, ex, session, tmpdir, src):
     dest = os.path.join(tmpdir, "clone")
     await _timed_run(
         rec, ex, session, "git_clone_local",
@@ -262,16 +258,16 @@ async def workload_clone(rec, ex, session, tmpdir, repo_root):
         rec.ops[-1]["note"] = f"src={src}"
 
 
-async def workload_worktree(rec, ex, session, tmpdir, repo_root):
+async def workload_worktree(rec, ex, session, tmpdir, repo):
     wt = os.path.join(tmpdir, "wt")
     await _timed_run(
         rec, ex, session, "git_worktree_add",
-        f"git -C {shlex.quote(str(repo_root))} worktree add --detach "
+        f"git -C {shlex.quote(str(repo))} worktree add --detach "
         f"{shlex.quote(wt)} HEAD",
     )
     try:
         subprocess.run(
-            ["git", "-C", str(repo_root), "worktree", "remove", "--force", wt],
+            ["git", "-C", str(repo), "worktree", "remove", "--force", wt],
             capture_output=True, timeout=60,
         )
     except Exception:  # noqa: BLE001 - best-effort cleanup
@@ -290,8 +286,15 @@ async def workload_reflink(rec, ex, session, tmpdir):
     try:
         exit_code, output = await ex.run(session, cmd)
     except Exception as e:  # noqa: BLE001 - record failure, keep going
-        rec.add("reflink_copy", time.perf_counter() - t0,
-                ok=False, note=f"{type(e).__name__}: {e}")
+        # Session executors raise on nonzero exit (check="raise"); a
+        # filesystem that cannot clone is an "unsupported" answer, not a
+        # harness failure -- but only for the known signal.
+        if "not supported" in str(e).lower():
+            rec.add("reflink_copy", time.perf_counter() - t0, ok=True,
+                    note=f"unsupported: {str(e)[-200:]}")
+        else:
+            rec.add("reflink_copy", time.perf_counter() - t0,
+                    ok=False, note=f"{type(e).__name__}: {e}")
         return
     wall = time.perf_counter() - t0
     if exit_code != 0:
@@ -316,14 +319,21 @@ async def main_async(args):
 
     sizes = QUICK_FILE_SIZES if args.quick else FILE_SIZES
     n_files = QUICK_TREE_FILES if args.quick else TREE_FILES
+    if args.clone_src:
+        clone_src = args.clone_src
+    elif os.path.isdir(CLONE_SRC_CANDIDATE):
+        clone_src = CLONE_SRC_CANDIDATE
+    else:
+        clone_src = str(repo_root)
+    worktree_repo = args.worktree_repo or str(repo_root)
     session = "bench-main-b"
     if ex.supports_sessions:
         await ex.create_session(session)
     with tempfile.TemporaryDirectory(prefix="workload-b-") as tmpdir:
         await workload_file_sizes(rec, ex, tmpdir, sizes)
         await workload_unpack(rec, ex, session, tmpdir, n_files)
-        await workload_clone(rec, ex, session, tmpdir, repo_root)
-        await workload_worktree(rec, ex, session, tmpdir, repo_root)
+        await workload_clone(rec, ex, session, tmpdir, clone_src)
+        await workload_worktree(rec, ex, session, tmpdir, worktree_repo)
         await workload_reflink(rec, ex, session, tmpdir)
     if ex.supports_sessions:
         await ex.close_session(session)
@@ -339,6 +349,8 @@ async def main_async(args):
         "quick": args.quick,
         "file_sizes": list(sizes),
         "tree_files": n_files,
+        "clone_src": clone_src,
+        "worktree_repo": worktree_repo,
         "wall_total_s": wall_total,
         "executor_cpu_s": cpu_self,
         "child_cpu_s": cpu_child,
@@ -373,6 +385,10 @@ def main():
     parser.add_argument("--variant", choices=sorted(EXECUTORS), required=True)
     parser.add_argument("--quick", action="store_true",
                         help="small fast verification pass, not a headline result")
+    parser.add_argument("--clone-src", default=None,
+                        help="git source for the clone op (default: /tmp/swerex-ref if present, else this repo)")
+    parser.add_argument("--worktree-repo", default=None,
+                        help="repo for the worktree op (default: this repo)")
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--out-dir", default="benchmark-results")
     args = parser.parse_args()

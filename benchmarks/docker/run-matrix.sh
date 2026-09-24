@@ -117,7 +117,9 @@ run_arm a-direct "$SYS_PY" "" -- \
     rundock "$SYS_PY" /opt/harness/scripts/run_workload_a.py --variant direct \
     --n-tiny "$N_TINY" --concurrent "$CONCURRENT" --out-dir "$OUT"
 
-B=(/opt/harness/scripts/run_workload_b.py --variant swerex-local --out-dir "$OUT")
+# Container git ops target the fixture repo (the build context has no .git).
+B=(/opt/harness/scripts/run_workload_b.py --variant swerex-local --out-dir "$OUT"
+  --clone-src /opt/fixtures/demo-repo --worktree-repo /opt/fixtures/demo-repo)
 run_arm b-upstream "$SYS_PY" "" -- rundock "$SYS_PY" "${B[@]}"
 run_arm b-opt-plain "$OPT_PY" "" -- rundock "$OPT_PY" "${B[@]}"
 ( export SWEREX_OPT_SKIP_SYNTAX_CHECK=1 SWEREX_OPT_SINGLE_SUBMIT=1 SWEREX_OPT_NO_FIXED_SLEEP=1

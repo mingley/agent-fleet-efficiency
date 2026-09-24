@@ -34,6 +34,14 @@ RUN git init -q /opt/swerex-opt-src \
     && /opt/venv-opt/bin/pip install -q /opt/swerex-opt-src aiohttp \
     && /opt/venv-opt/bin/python -c "import swerex; print('opt swerex ok')"
 
+# Fixture git repo for workload-B clone/worktree ops (offline, deterministic).
+RUN git init -q /opt/fixtures/demo-repo \
+    && cd /opt/fixtures/demo-repo \
+    && git config user.email bench@example.com && git config user.name bench \
+    && echo hello > README.md && mkdir -p src && echo 'print(1)' > src/a.py \
+    && git add -A && GIT_AUTHOR_DATE='2026-01-01T00:00:00Z' GIT_COMMITTER_DATE='2026-01-01T00:00:00Z' git commit -qm init \
+    && echo more >> README.md && git commit -qam second
+
 # Harness scripts (record_host.py, run_workload_a.py, ...).
 COPY benchmarks/scripts/ /opt/harness/scripts/
 
