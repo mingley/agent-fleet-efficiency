@@ -79,3 +79,15 @@ observed outcome), `interrupt`, and `file_op` events.
 ```sh
 python3 benchmarks/scripts/validate_trace.py benchmarks/fixtures/sample-trace.jsonl
 ```
+
+## Optimized Python (P0.5)
+
+Build a second venv from the pinned SWE-ReX plus the experimental patch
+series in `patches/swerex-p0.5/` (see its README for flags and known
+semantic deltas), then run any workload with that interpreter:
+
+```sh
+benchmarks/scripts/build-opt-venv.sh
+SWEREX_OPT_SKIP_SYNTAX_CHECK=1 SWEREX_OPT_SINGLE_SUBMIT=1 SWEREX_OPT_NO_FIXED_SLEEP=1 \
+  .venv-opt/bin/python benchmarks/scripts/run_workload_a.py --variant swerex-local
+```

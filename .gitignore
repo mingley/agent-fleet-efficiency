@@ -5,3 +5,5 @@ benchmark-results/
 .venv/
 __pycache__/
 *.pyc
+.opt-src/
+.venv-opt/

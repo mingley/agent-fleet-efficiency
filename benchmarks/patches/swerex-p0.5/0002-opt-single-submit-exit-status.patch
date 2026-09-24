@@ -1,0 +1,164 @@
+diff --git a/src/swerex/runtime/local.py b/src/swerex/runtime/local.py
+index c89d8c8..ade4316 100644
+--- a/src/swerex/runtime/local.py
++++ b/src/swerex/runtime/local.py
+@@ -142,6 +142,9 @@ class BashSession(Session):
+         self._ps1 = "SHELLPS1PREFIX"
+         self._shell: pexpect.spawn | None = None
+         self.logger = logger or get_logger("rex-session")
++        # P0.5: sequence numbers single-submit exit framings so a late
++        # framing from a timed-out command is never mistaken for fresh.
++        self._single_submit_seq = 0
+ 
+     @property
+     def shell(self) -> pexpect.spawn:
+@@ -289,6 +292,17 @@ class BashSession(Session):
+         assert self.shell is not None
+         _check_bash_command(action.command)
+ 
++        # P0.5: with SWEREX_OPT_SINGLE_SUBMIT=1, frame the exit code in the
++        # single command submission (Part 2) and skip the extra
++        # EXITCODESTART/END round trip (Part 3). Unset preserves upstream.
++        _single_submit = os.environ.get("SWEREX_OPT_SINGLE_SUBMIT") == "1" and action.check != "ignore"
++        _exit_code_prefix = "EXITCODESTART"
++        _exit_code_suffix = "EXITCODEEND"
++        _single_submit_seq = 0
++        if _single_submit:
++            self._single_submit_seq += 1
++            _single_submit_seq = self._single_submit_seq
++
+         # Part 2: Execute the command
+ 
+         fallback_terminator = False
+@@ -303,10 +317,33 @@ class BashSession(Session):
+             # Bashlex is very buggy and can throw a variety of errors, including
+             # ParsingErrors, NotImplementedErrors, TypeErrors, possibly more. So we catch them all
+             self.logger.error("Bashlex fail: %s", e)
+-            action.command += f"\n TMPEXITCODE=$? ; sleep 0.1; echo -n '{self._UNIQUE_STRING}' ; (exit $TMPEXITCODE)"
++            if _single_submit:
++                # No `(exit $TMPEXITCODE)` restore: the framing echo is last, so
++                # `$?` is 0 afterwards, matching upstream state after Part 3.
++                action.command += (
++                    f"\n TMPEXITCODE=$? ; sleep 0.1"
++                    f" ; echo '{_exit_code_prefix}{_single_submit_seq}:'$TMPEXITCODE'{_exit_code_suffix}'"
++                    f" ; echo -n '{self._UNIQUE_STRING}'"
++                )
++            else:
++                action.command += f"\n TMPEXITCODE=$? ; sleep 0.1; echo -n '{self._UNIQUE_STRING}' ; (exit $TMPEXITCODE)"
+             fallback_terminator = True
+         else:
+             action.command = " ; ".join(individual_commands)
++            if _single_submit:
++                # Same-line framing: a newline separator would make the shell print
++                # an intermediate prompt before the framing echo runs. `$?` still
++                # reads the last command's status, matching the upstream echo.
++                stripped = action.command.strip()
++                if not stripped:
++                    action.command = f"echo {_exit_code_prefix}{_single_submit_seq}:$?{_exit_code_suffix}"
++                elif stripped.endswith("&"):
++                    # `;` would be a syntax error after `&`; `&` already separates.
++                    action.command = f"{stripped} echo {_exit_code_prefix}{_single_submit_seq}:$?{_exit_code_suffix}"
++                else:
++                    action.command = (
++                        f"{stripped.rstrip(';').rstrip()} ; echo {_exit_code_prefix}{_single_submit_seq}:$?{_exit_code_suffix}"
++                    )
+         self.shell.sendline(action.command)
+         if not fallback_terminator:
+             expect_strings = action.expect + [self._ps1]
+@@ -320,6 +357,9 @@ class BashSession(Session):
+             raise CommandTimeoutError(msg) from e
+         output: str = _strip_control_chars(self.shell.before)  # type: ignore
+ 
++        if _single_submit:
++            return self._parse_single_submit(action, output, matched_expect_string, fallback_terminator, _single_submit_seq)
++
+         # Part 3: Get the exit code
+         if action.check == "ignore":
+             return BashObservation(output=output, exit_code=None, expect_string=matched_expect_string)
+@@ -354,6 +394,86 @@ class BashSession(Session):
+             exit_code = None
+         return BashObservation(output=output, exit_code=exit_code, expect_string=matched_expect_string)
+ 
++    def _parse_single_submit(
++        self, action: BashAction, output: str, matched_expect_string: str, fallback_terminator: bool, seq: int
++    ) -> BashObservation:
++        """Parse output and exit code from a single-submission framed command.
++
++        P0.5 companion to `_run_normal` for SWEREX_OPT_SINGLE_SUBMIT=1: the
++        EXITCODESTART<n>EXITCODEEND framing was submitted inline with the
++        command, so no second round trip is needed. A first match on a stale
++        prompt (or a custom expect string) is followed up by waiting for the
++        completion prompt, mirroring upstream timeout/error behavior.
++        """
++        assert self.shell is not None
++        _exit_code_prefix = "EXITCODESTART"
++        _exit_code_suffix = "EXITCODEEND"
++
++        def _framing(output: str) -> tuple[str, int | None]:
++            # Only the current sequence number counts: stale framing from a
++            # command that outlived its timeout is skipped, as is any
++            # lookalike marker in the command's own output. Last match wins.
++            matches = list(re.finditer(f"{_exit_code_prefix}{seq}:([0-9]+)", output))
++            if not matches:
++                return output, None
++            last = matches[-1]
++            return output[: last.start()], int(last.group(1))
++
++        try:
++            if not fallback_terminator and matched_expect_string != self._ps1:
++                # A custom expect string matched before completion; collect the
++                # completion prompt (same 1s budget as the upstream Part 3 wait).
++                try:
++                    self.shell.expect(self._ps1, timeout=1)
++                except pexpect.TIMEOUT:
++                    msg = "timeout while getting exit code"
++                    raise NoExitCodeError(msg)
++                output += _strip_control_chars(self.shell.before)  # type: ignore
++            output, exit_code = _framing(output)
++            if exit_code is None:
++                # No framing yet: the first match hit a stale prompt (or a
++                # lookalike marker). Keep collecting until the framing
++                # arrives, bounded by the action timeout like Part 2.
++                sync_pattern = self._UNIQUE_STRING if fallback_terminator else self._ps1
++                deadline = None if action.timeout is None else time.monotonic() + action.timeout
++                while exit_code is None:
++                    if deadline is not None and time.monotonic() >= deadline:
++                        msg = f"timeout after {action.timeout} seconds while running command {action.command!r}"
++                        raise CommandTimeoutError(msg)
++                    remaining = None if deadline is None else max(deadline - time.monotonic(), 0.1)
++                    try:
++                        self.shell.expect(sync_pattern, timeout=remaining)
++                    except pexpect.TIMEOUT as e:
++                        msg = f"timeout after {action.timeout} seconds while running command {action.command!r}"
++                        raise CommandTimeoutError(msg) from e
++                    output += _strip_control_chars(self.shell.before)  # type: ignore
++                    output, exit_code = _framing(output)
++            if fallback_terminator:
++                # Consume the completion prompt so the session stays in sync
++                # (mirrors the upstream trailing PS1 expect).
++                try:
++                    self.shell.expect(self._ps1, timeout=0.1)
++                except pexpect.TIMEOUT:
++                    msg = "Timeout while getting PS1 after exit code extraction"
++                    raise CommandTimeoutError(msg)
++            # Drop stale framings from commands that outlived their timeout: only
++            # the current sequence number is fresh, and older framings (which
++            # provably predate this submission) carry no output owned by it.
++            stale = [
++                m
++                for m in re.finditer(f"{_exit_code_prefix}([0-9]+):[0-9]+{_exit_code_suffix}", output)
++                if int(m.group(1)) < seq
++            ]
++            if stale:
++                output = output[stale[-1].end() :]
++            output = output.replace(self._UNIQUE_STRING, "").replace(self._ps1, "")
++        except Exception:
++            # Ignore all exceptions if check == 'silent'
++            if action.check == "raise":
++                raise
++            exit_code = None
++        return BashObservation(output=output, exit_code=exit_code, expect_string=matched_expect_string)
++
+     async def close(self) -> CloseSessionResponse:
+         if self._shell is None:
+             return CloseBashSessionResponse()

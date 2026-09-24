@@ -1,0 +1,22 @@
+diff --git a/src/swerex/runtime/local.py b/src/swerex/runtime/local.py
+index ade4316..cd23dce 100644
+--- a/src/swerex/runtime/local.py
++++ b/src/swerex/runtime/local.py
+@@ -170,10 +170,15 @@ class BashSession(Session):
+             echo=False,
+             env=dict(os.environ.copy(), **{"PS1": self._ps1, "PS2": "", "PS0": ""}),  # type: ignore
+         )
+-        await asyncio.sleep(0.3)
++        # P0.5: with SWEREX_OPT_NO_FIXED_SLEEP=1, skip the fixed startup delays
++        # and rely on the PS1 prompt synchronization below instead.
++        if os.environ.get("SWEREX_OPT_NO_FIXED_SLEEP") != "1":
++            await asyncio.sleep(0.3)
+         cmds = []
+         if self.request.startup_source:
+-            cmds += [f"source {path}" for path in self.request.startup_source] + ["sleep 0.3"]
++            cmds += [f"source {path}" for path in self.request.startup_source]
++            if os.environ.get("SWEREX_OPT_NO_FIXED_SLEEP") != "1":
++                cmds += ["sleep 0.3"]
+         cmds += self._get_reset_commands()
+         cmd = " ; ".join(cmds)
+         self.shell.sendline(cmd)
