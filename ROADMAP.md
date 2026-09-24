@@ -195,3 +195,27 @@ A useful result is one of:
 - evidence that a proposed rewrite is not worth doing
 
 Negative results are valid output.
+
+## Execution record (2026-09-24)
+
+- P0 benchmark harness: DONE. Workloads A/B/C, server workload,
+  trace schema + validator + replay harness, dual-env Docker image,
+  resumable 13-arm matrix, summarizer. Full matrix green (0 failures).
+- P0.5 optimized Python: DONE, exit reviewed (DECISIONS.md). Six
+  flag-gated patches; local flags halve per-command latency
+  (113ms -> 55ms Linux N=1000); server flags latency-neutral at
+  sequential localhost shape.
+- P1 agent-execd: DONE, gate PASSED (DECISIONS.md). Wire-compatible
+  Rust server (10 routes, parity 43/43), N=200 gate: rust tiny
+  0.57ms vs opt-Python 58ms vs upstream 141ms; Linux rerun confirms
+  (0.48ms vs 117.73ms); 20-way concurrency 6ms/7.7MB vs 2.9s/74MB.
+- P2 build caches: harness DONE, initial numbers captured
+  (cold/warm/touch for Rust/Python/C fixtures; sccache/ccache arms
+  record skipped when absent). Real-repo measurements remain.
+- P3 provisioning: harness DONE, initial numbers captured (10k-file
+  tree macOS: clone 5.5s, worktree 1.9s, cp 9.6s, tar 10.4s,
+  reflink 7.1s). Snapshot-mount/NFS comparisons remain.
+- P4/P5 integrations: DEFERRED. No evidence yet that a second
+  framework or RL rollout needs the primitive; revisit when a
+  concrete consumer with measurements appears. The compat surface
+  (docs/p1-compat.md) and parity suite keep the option cheap.
