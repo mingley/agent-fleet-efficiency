@@ -19,12 +19,16 @@ Usage (from repo root):
     SWEREX_OPT_STREAM_UPLOAD=1 .venv-opt/bin/python \\
         benchmarks/scripts/run_workload_server.py --quick \\
         --server-python .venv-opt/bin/python
+    .venv/bin/python benchmarks/scripts/run_workload_server.py --quick \\
+        --server-cmd './target/release/agent-execd --host 127.0.0.1 \\
+        --port {port} --auth-token {token}' --label rust
 """
 
 import argparse
 import asyncio
 import json
 import os
+import shlex
 
 # Quiet swerex's rich DEBUG logging (read at swerex import time) unless the
 # caller overrides it; keeps the latency tables readable.
@@ -41,6 +45,9 @@ from datetime import datetime, timezone
 
 AUTH_TOKEN = "bench-token-p05"
 SERVER_FLAGS = (
+    "SWEREX_OPT_SKIP_SYNTAX_CHECK",
+    "SWEREX_OPT_SINGLE_SUBMIT",
+    "SWEREX_OPT_NO_FIXED_SLEEP",
     "SWEREX_OPT_REUSE_SESSION",
     "SWEREX_OPT_BOUNDED_IDEMPOTENCY",
     "SWEREX_OPT_STREAM_UPLOAD",
@@ -171,17 +178,24 @@ async def main_async(args):
         prefix="swerex-server-", suffix=".log", delete=False
     )
     server_log.close()
-    server_cmd = [
-        server_python,
-        "-m",
-        "swerex.server",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        str(port),
-        "--auth-token",
-        AUTH_TOKEN,
-    ]
+    if args.server_cmd:
+        server_cmd = [
+            tok.replace("{port}", str(port)).replace("{token}", AUTH_TOKEN)
+            for tok in shlex.split(args.server_cmd)
+        ]
+        server_python = os.path.abspath(server_cmd[0])
+    else:
+        server_cmd = [
+            server_python,
+            "-m",
+            "swerex.server",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--auth-token",
+            AUTH_TOKEN,
+        ]
     proc = subprocess.Popen(
         server_cmd,
         stdout=open(server_log.name, "w"),
@@ -315,6 +329,14 @@ def main():
         "--server-python",
         default=sys.executable,
         help="interpreter used to run the swerex-remote server (default: this interpreter)",
+    )
+    parser.add_argument(
+        "--server-cmd",
+        default="",
+        help="shell command used to launch the server instead of "
+        "`<server-python> -m swerex.server`; shlex-split after formatting "
+        "{port}/{token} placeholders (e.g. --server-cmd './target/release/agent-execd "
+        "--host 127.0.0.1 --port {port} --auth-token {token}')",
     )
     parser.add_argument("--server-timeout", type=float, default=30.0)
     parser.add_argument("--label", default="")

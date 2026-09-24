@@ -58,3 +58,27 @@ total task cost is unknown, and the P0 exit rule turns on it.
 Limitations: single run, Docker Desktop linux/arm64 (not fleet
 amd64 bare metal), no CPU pinning, no server-side RSS, no variance
 analysis. Numbers are comparison evidence, not fleet claims.
+
+## 2026-09-24 — P1 gate: PASS, agent-execd becomes the execution plane
+
+Three-way server workload, N=200, macOS localhost, all 0 failures:
+upstream tiny 141.43ms / create 362ms; optimized Python (all six
+P0.5 flags) tiny 58.22ms / create 62ms; Rust agent-execd tiny
+0.57ms / create 28ms / 10MiB upload 18ms (vs 41-49ms). Parity suite
+43/43 PASS against upstream (status, error classes, exit codes,
+content lines). Server startup 433ms -> 11ms.
+
+The 2->3 delta (~100x per command, ~2x session create) clears the
+roadmap's Rust evidence bar with wide margin: the remaining ~58ms
+in optimized Python is prompt-sync/read-loop architecture that the
+native implementation removes (event-driven PTY reads, no sleeps,
+no per-command subprocesses), while preserving wire compatibility.
+
+Decision: agent-execd is the execution plane going forward. Next:
+rerun the gate in Linux containers for fleet-arch numbers, add
+server-side CPU/RSS collection, and continue workload C/D plus
+P2/P3 (caches, CoW workspaces) as independent wins.
+
+Limitations: macOS localhost (not Linux fleet arch), sequential
+load only, no server-side RSS, single run each, no concurrency
+sweep on the Rust server yet.

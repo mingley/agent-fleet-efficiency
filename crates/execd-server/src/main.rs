@@ -2,7 +2,7 @@
 //! See docs/p1-compat.md §§1, 3.3, 3.5–3.9, 4.
 
 use axum::{
-    extract::{Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, State},
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -602,6 +602,10 @@ async fn main() {
         .route("/write_file", post(write_file))
         .route("/upload", post(upload))
         .route("/close", post(close))
+        // Upstream imposes no request-body cap; axum defaults to 2 MiB,
+        // which rejects benchmark-sized uploads. Memory stays bounded
+        // because /upload streams to a temp file (never buffers whole).
+        .layer(DefaultBodyLimit::disable())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             require_api_key,

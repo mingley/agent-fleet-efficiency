@@ -118,3 +118,18 @@ SWEREX_OPT_REUSE_SESSION=1 SWEREX_OPT_BOUNDED_IDEMPOTENCY=1 SWEREX_OPT_STREAM_UP
   .venv-opt/bin/python benchmarks/scripts/run_workload_server.py --quick --label opt-flags \
   --server-python .venv-opt/bin/python
 ```
+
+Target the Rust server instead with `--server-cmd` (`{port}` and
+`{token}` are substituted per run):
+
+```sh
+uv run python benchmarks/scripts/run_workload_server.py --quick --label rust \
+  --server-cmd './target/release/agent-execd --host 127.0.0.1 --port {port} --auth-token {token}'
+```
+
+`check_parity.py` diffs the Rust server against upstream over 43
+vectors (status, error class, exit code, content lines):
+
+```sh
+uv run python benchmarks/scripts/check_parity.py
+```
