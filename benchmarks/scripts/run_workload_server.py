@@ -6,6 +6,18 @@ drives N tiny remote commands via RemoteRuntime plus one ~10MiB upload,
 and reports per-op latency and failures to stdout + JSONL in
 benchmark-results/.
 
+After the server subprocess is terminated and reaped, server resource
+accounting is recorded: server_cpu_s (getrusage RUSAGE_CHILDREN cpu
+delta across the run -- the server is the dominant child, so this is an
+approximation, stored as server_cpu_s_approx) and server_peak_rss_bytes
+(RUSAGE_CHILDREN ru_maxrss after wait, normalized macOS-bytes vs
+Linux-KiB). Both appear in the JSONL summary and the stdout table line.
+
+With --concurrent-sessions N (default 0 = off), after the sequential
+tiny phase the workload creates N sessions, runs one `true` in each
+concurrently via asyncio.gather (per-op remote_concurrent_true plus
+total remote_concurrent_total), then closes all sessions.
+
 Stdlib + swerex only: the RemoteRuntime client needs aiohttp (which
 upstream remote.py already imports but does not declare), and the server
 readiness probe uses stdlib urllib. The server subprocess inherits this
@@ -28,6 +40,7 @@ import argparse
 import asyncio
 import json
 import os
+import resource
 import shlex
 
 # Quiet swerex's rich DEBUG logging (read at swerex import time) unless the
@@ -98,6 +111,17 @@ class Recorder:
 
     def failures(self):
         return [rec for rec in self.ops if not rec["ok"]]
+
+
+def _cpu_seconds(who):
+    r = resource.getrusage(who)
+    return r.ru_utime + r.ru_stime
+
+
+def _child_maxrss_bytes():
+    # ru_maxrss is bytes on macOS, KiB on Linux.
+    scale = 1 if sys.platform == "darwin" else 1024
+    return resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss * scale
 
 
 def _pick_free_port():
@@ -196,6 +220,7 @@ async def main_async(args):
             "--auth-token",
             AUTH_TOKEN,
         ]
+    cpu_child_0 = _cpu_seconds(resource.RUSAGE_CHILDREN)
     proc = subprocess.Popen(
         server_cmd,
         stdout=open(server_log.name, "w"),
@@ -231,6 +256,55 @@ async def main_async(args):
                 if obs.exit_code != 0:
                     rec.ops[-1]["ok"] = False
                     rec.ops[-1]["note"] = f"exit_code={obs.exit_code}"
+
+        k = args.concurrent_sessions
+        if k > 0:
+            cc_names = [f"bench-cc-{i}" for i in range(k)]
+            for name in cc_names:
+                t_cc = time.perf_counter()
+                try:
+                    await rt.create_session(CreateBashSessionRequest(session=name))
+                except Exception as e:  # noqa: BLE001 - record failure, keep going
+                    rec.add(
+                        "remote_concurrent_create",
+                        time.perf_counter() - t_cc,
+                        ok=False,
+                        note=f"{type(e).__name__}: {e}",
+                    )
+
+            async def _cc_one(name):
+                t1 = time.perf_counter()
+                try:
+                    obs = await rt.run_in_session(BashAction(command="true", session=name))
+                except Exception as e:  # noqa: BLE001 - per-op failure
+                    return (time.perf_counter() - t1, 0, 0, False, f"{type(e).__name__}: {e}")
+                code = obs.exit_code or 0
+                ok = code == 0
+                return (
+                    time.perf_counter() - t1,
+                    code,
+                    len(obs.output or ""),
+                    ok,
+                    "" if ok else f"exit_code={code}",
+                )
+
+            t_cc0 = time.perf_counter()
+            cc_results = await asyncio.gather(*(_cc_one(n) for n in cc_names))
+            rec.add("remote_concurrent_total", time.perf_counter() - t_cc0, note=f"k={k}")
+            for wall, code, out_len, ok, note in cc_results:
+                rec.add(
+                    "remote_concurrent_true",
+                    wall,
+                    out_bytes=out_len,
+                    exit_code=code,
+                    ok=ok,
+                    note=note,
+                )
+            for name in cc_names:
+                try:
+                    await rt.close_session(CloseBashSessionRequest(session=name))
+                except Exception as e:  # noqa: BLE001 - record failure, keep going
+                    rec.add("remote_concurrent_close", 0.0, ok=False, note=f"{type(e).__name__}: {e}")
 
         src_path = os.path.join(workdir, "upload-src.bin")
         _write_upload_source(src_path, upload_bytes)
@@ -276,6 +350,10 @@ async def main_async(args):
             proc.wait(timeout=10)
 
     wall_total = time.perf_counter() - t_start
+    # Server is reaped above, so RUSAGE_CHILDREN now includes it (it is the
+    # dominant child; other reaped children add noise -- hence approx).
+    server_cpu_s = _cpu_seconds(resource.RUSAGE_CHILDREN) - cpu_child_0
+    server_peak_rss_bytes = _child_maxrss_bytes()
     failures = rec.failures()
     summary = {
         "type": "summary",
@@ -289,8 +367,13 @@ async def main_async(args):
         "flags": flags,
         "n_tiny": n_tiny,
         "upload_mib": args.upload_mib,
+        "concurrent_sessions": args.concurrent_sessions,
         "server_log": server_log.name,
         "wall_total_s": wall_total,
+        "server_cpu_s": server_cpu_s,
+        "server_cpu_s_approx": server_cpu_s,
+        "server_cpu_note": "RUSAGE_CHILDREN cpu delta; server is the dominant child",
+        "server_peak_rss_bytes": server_peak_rss_bytes,
         "failures": len(failures),
         "by_op": rec.summarize(),
     }
@@ -303,7 +386,12 @@ async def main_async(args):
             f.write(json.dumps({"type": "op", **op_rec}) + "\n")
         f.write(json.dumps(summary) + "\n")
 
-    print(f"label={label} wall={wall_total:.1f}s failures={len(failures)}")
+    print(
+        f"label={label} wall={wall_total:.1f}s "
+        f"server_cpu={server_cpu_s:.2f}s "
+        f"server_peak_rss={server_peak_rss_bytes / 1e6:.1f}MB "
+        f"failures={len(failures)}"
+    )
     print(f"client={sys.executable} server={server_python}")
     print("flags=" + " ".join(f"{k}={v or '0'}" for k, v in flags.items()))
     print(f"wrote {out_path}")
@@ -324,6 +412,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-tiny", type=int, default=50)
     parser.add_argument("--quick", action="store_true", help="fast pass: 5 tiny commands")
+    parser.add_argument(
+        "--concurrent-sessions",
+        type=int,
+        default=0,
+        help="concurrency sweep size: create N sessions and run one `true` "
+        "in each concurrently via asyncio.gather (default 0 = off)",
+    )
     parser.add_argument("--upload-mib", type=int, default=10)
     parser.add_argument(
         "--server-python",

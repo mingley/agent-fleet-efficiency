@@ -134,6 +134,13 @@ vectors (status, error class, exit code, content lines):
 uv run python benchmarks/scripts/check_parity.py
 ```
 
+The server workload also records server CPU/RSS (via the reaped
+server process) and supports a concurrency sweep:
+
+```sh
+uv run python benchmarks/scripts/run_workload_server.py --quick --concurrent-sessions 20
+```
+
 ## Workload C (build caches)
 
 Cold vs warm vs touch-one rebuild/test times for generated offline
