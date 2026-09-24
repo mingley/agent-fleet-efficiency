@@ -133,3 +133,24 @@ vectors (status, error class, exit code, content lines):
 ```sh
 uv run python benchmarks/scripts/check_parity.py
 ```
+
+## Workload C (build caches)
+
+Cold vs warm vs touch-one rebuild/test times for generated offline
+fixtures (Rust/cargo, Python/unittest, C/make), plus sccache/ccache
+arms when those tools exist (recorded skipped otherwise):
+
+```sh
+python3 benchmarks/scripts/run_workload_c.py --quick
+python3 benchmarks/scripts/run_workload_c.py
+```
+
+## Workspace provisioning (P3)
+
+Full clone vs worktree vs `cp -r` vs tar pipe vs reflink on a
+deterministic 10k-file tree (1k with `--quick`), cold vs warm reps:
+
+```sh
+python3 benchmarks/scripts/run_workload_provision.py --quick
+python3 benchmarks/scripts/run_workload_provision.py
+```
