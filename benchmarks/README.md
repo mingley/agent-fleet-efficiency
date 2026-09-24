@@ -66,3 +66,16 @@ uv run python benchmarks/scripts/run_workload_b.py --variant direct --quick
 
 `--quick` skips the 100MiB files and shrinks the unpack tree for a fast
 verification pass.
+
+## Trace format (workload D)
+
+Agent execution traces are JSONL, one event per line: a leading
+`trace_header`, then `session_start`/`session_end`, `command` (request +
+observed outcome), `interrupt`, and `file_op` events.
+
+- `schemas/trace.schema.json` — normative field types
+- `fixtures/sample-trace.jsonl` — small example trace
+
+```sh
+python3 benchmarks/scripts/validate_trace.py benchmarks/fixtures/sample-trace.jsonl
+```

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mingley/agent-fleet-efficiency/benchmarks/schemas/trace.schema.json",
+  "title": "Agent execution trace (JSONL, one event per line)",
+  "description": "Workload D trace format: enough of the execution plane to replay without LLM inference. See docs/benchmark-plan.md.",
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["type", "seq", "t_ms"],
+      "properties": {
+        "type": {"type": "string"},
+        "seq": {"type": "integer", "minimum": 0},
+        "t_ms": {"type": "number", "minimum": 0}
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "description": "First line of a trace file.",
+      "type": "object",
+      "required": ["type", "seq", "t_ms", "trace_version", "source"],
+      "properties": {
+        "type": {"const": "trace_header"},
+        "seq": {"const": 0},
+        "t_ms": {"const": 0},
+        "trace_version": {"const": 1},
+        "source": {"type": "string"},
+        "repo": {"type": "string"},
+        "commit": {"type": "string"},
+        "captured_at": {"type": "string"}
+      }
+    },
+    {
+      "description": "Open a persistent shell session.",
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["session"],
+          "properties": {
+            "type": {"const": "session_start"},
+            "session": {"type": "string", "minLength": 1},
+            "startup_source": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Close a persistent shell session.",
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["session"],
+          "properties": {
+            "type": {"const": "session_end"},
+            "session": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    {
+      "description": "Run one command and observe its outcome.",
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["session", "command", "duration_ms", "exit_code", "stdout_bytes", "stderr_bytes"],
+          "properties": {
+            "type": {"const": "command"},
+            "session": {"type": "string", "minLength": 1},
+            "command": {"type": "string"},
+            "cwd": {"type": "string", "default": ""},
+            "env_delta": {
+              "type": "object",
+              "additionalProperties": {"type": "string"},
+              "default": {}
+            },
+            "timeout_s": {"type": ["number", "null"], "default": null},
+            "is_interactive": {"type": "boolean", "default": false},
+            "duration_ms": {"type": "number", "minimum": 0},
+            "exit_code": {"type": ["integer", "null"]},
+            "stdout_bytes": {"type": "integer", "minimum": 0},
+            "stderr_bytes": {"type": "integer", "minimum": 0},
+            "stdout_sha256": {"type": "string", "default": ""}
+          }
+        }
+      ]
+    },
+    {
+      "description": "Interrupt the foreground command in a session.",
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["session"],
+          "properties": {
+            "type": {"const": "interrupt"},
+            "session": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    {
+      "description": "File transfer or local file IO observed during the run.",
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["op", "path", "size_bytes", "duration_ms"],
+          "properties": {
+            "type": {"const": "file_op"},
+            "op": {"enum": ["read", "write", "upload"]},
+            "path": {"type": "string", "minLength": 1},
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "duration_ms": {"type": "number", "minimum": 0}
+          }
+        }
+      ]
+    }
+  ]
+}

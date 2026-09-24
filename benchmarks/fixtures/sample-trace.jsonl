@@ -1,0 +1,7 @@
+{"t_ms": 0, "seq": 0, "source": "sample", "trace_version": 1, "type": "trace_header"}
+{"t_ms": 3, "seq": 1, "session": "default", "startup_source": [], "type": "session_start"}
+{"t_ms": 410, "seq": 2, "session": "default", "command": "git status --short", "cwd": "/work/demo", "env_delta": {}, "timeout_s": null, "is_interactive": false, "duration_ms": 138.2, "exit_code": 0, "stdout_bytes": 42, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 560, "seq": 3, "session": "default", "command": "export BENCH_MARKER=alive-42", "cwd": "/work/demo", "env_delta": {"BENCH_MARKER": "alive-42"}, "timeout_s": null, "is_interactive": false, "duration_ms": 131.7, "exit_code": 0, "stdout_bytes": 0, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 705, "seq": 4, "session": "default", "command": "python -m pytest tests/ -x -q", "cwd": "/work/demo", "env_delta": {}, "timeout_s": 300.0, "is_interactive": false, "duration_ms": 42110.5, "exit_code": 0, "stdout_bytes": 8192, "stderr_bytes": 120, "stdout_sha256": "", "type": "command"}
+{"t_ms": 42830, "seq": 5, "op": "write", "path": "/work/demo/notes.txt", "size_bytes": 4096, "duration_ms": 1.1, "type": "file_op"}
+{"t_ms": 42840, "seq": 6, "session": "default", "type": "session_end"}
