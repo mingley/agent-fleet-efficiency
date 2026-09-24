@@ -9,8 +9,11 @@ path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-axum = "0.7"
+axum = { version = "0.7", features = ["multipart"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 execd-protocol = { path = "../execd-protocol" }
+execd-core = { path = "../execd-core" }
+tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }

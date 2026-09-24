@@ -597,7 +597,7 @@ impl BashSession {
                 pixel_height: 0,
             })
             .map_err(|e| ExecdError::SessionNotInitialized(format!("failed to open pty: {e}")))?;
-        setup_termios(&pair.master);
+        setup_termios(&*pair.master);
         let mut cmd = CommandBuilder::new("/usr/bin/env");
         cmd.arg("bash");
         for (k, v) in std::env::vars() {
@@ -1028,7 +1028,7 @@ impl BashSession {
 /// PTY input buffer, so the in-flight run hangs until its own timeout.
 /// Upstream's two-round-trip design is immune (the marker line is sent only
 /// after the run completes); ours sends it up front and must preserve it.
-fn setup_termios(master: &Box<dyn portable_pty::MasterPty + Send>) {
+fn setup_termios(master: &(dyn portable_pty::MasterPty + Send)) {
     #[cfg(unix)]
     {
         use nix::sys::termios::{tcgetattr, tcsetattr, LocalFlags, SetArg};

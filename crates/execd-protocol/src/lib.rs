@@ -1,7 +1,8 @@
 //! Wire models for agent-execd, mirroring the SWE-ReX JSON surface exactly.
-//! See docs/p1-compat.md §§3.1, 3.2, 3.6, 3.9.
+//! See docs/p1-compat.md §§3.1–3.9.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 fn default_session() -> String {
     "default".to_string()
@@ -163,6 +164,80 @@ pub struct BashObservation {
     pub session_type: String,
 }
 
+/// §3.7 `Command.command`: `str | list[str]` (untagged union, like pydantic).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CommandArg {
+    Text(String),
+    Argv(Vec<String>),
+}
+
+/// §3.7 `Command`: `command` (required), `timeout = None`, `shell = False`,
+/// `check = False`, `error_msg = ""`, `env = None`, `cwd = None`,
+/// `merge_output_streams = False`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Command {
+    pub command: CommandArg,
+    #[serde(default)]
+    pub timeout: Option<f64>,
+    #[serde(default)]
+    pub shell: bool,
+    #[serde(default)]
+    pub check: bool,
+    #[serde(default)]
+    pub error_msg: String,
+    #[serde(default)]
+    pub env: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub merge_output_streams: bool,
+}
+
+/// §3.7 `CommandResponse`: `stdout = ""`, `stderr = ""`,
+/// `exit_code: int | None = None`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommandResponse {
+    #[serde(default)]
+    pub stdout: String,
+    #[serde(default)]
+    pub stderr: String,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+}
+
+/// §3.8 request: `path` (required), `encoding = None`, `errors = None`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReadFileRequest {
+    pub path: String,
+    #[serde(default)]
+    pub encoding: Option<String>,
+    #[serde(default)]
+    pub errors: Option<String>,
+}
+
+/// §3.8 response: `content = ""`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReadFileResponse {
+    #[serde(default)]
+    pub content: String,
+}
+
+/// §3.8 request: `content`, `path` (both required).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WriteFileRequest {
+    pub content: String,
+    pub path: String,
+}
+
+/// §3.8 response: empty model, serializes to `{}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WriteFileResponse {}
+
+/// §3.8 response: empty model, serializes to `{}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UploadResponse {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,6 +383,86 @@ mod tests {
         let back: BashObservation =
             serde_json::from_value(json!({"output": "x", "exit_code": null})).unwrap();
         assert_eq!(back.exit_code, None);
+    }
+
+    #[test]
+    fn command_str_and_list_round_trip() {
+        // String form (shell-style).
+        let v: Command =
+            serde_json::from_value(json!({"command": "echo hi", "shell": true})).unwrap();
+        assert_eq!(v.command, CommandArg::Text("echo hi".to_string()));
+        assert!(v.shell);
+        assert_eq!(v.timeout, None);
+        assert!(!v.check);
+        assert_eq!(v.error_msg, "");
+        assert_eq!(v.env, None);
+        assert_eq!(v.cwd, None);
+        assert!(!v.merge_output_streams);
+        // List form (argv-style).
+        let v: Command = serde_json::from_value(json!({"command": ["echo", "hi"]})).unwrap();
+        assert_eq!(
+            v.command,
+            CommandArg::Argv(vec!["echo".to_string(), "hi".to_string()])
+        );
+        assert!(!v.shell);
+        // Full round trip with all fields.
+        let full = Command {
+            command: CommandArg::Argv(vec!["ls".to_string()]),
+            timeout: Some(5.0),
+            shell: false,
+            check: true,
+            error_msg: "ls failed".to_string(),
+            env: Some([("A".to_string(), "b".to_string())].into_iter().collect()),
+            cwd: Some("/tmp".to_string()),
+            merge_output_streams: true,
+        };
+        let back: Command = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
+        assert_eq!(back, full);
+        // command is required.
+        assert!(serde_json::from_value::<Command>(json!({})).is_err());
+        // Response shape.
+        let r = CommandResponse {
+            stdout: "o".to_string(),
+            stderr: "e".to_string(),
+            exit_code: Some(0),
+        };
+        assert_eq!(
+            serde_json::to_value(&r).unwrap(),
+            json!({"stdout": "o", "stderr": "e", "exit_code": 0})
+        );
+        let d: CommandResponse = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(d.exit_code, None);
+    }
+
+    #[test]
+    fn file_models_round_trip() {
+        let r: ReadFileRequest = serde_json::from_value(json!({"path": "/tmp/x"})).unwrap();
+        assert_eq!(r.path, "/tmp/x");
+        assert_eq!(r.encoding, None);
+        assert_eq!(r.errors, None);
+        assert!(serde_json::from_value::<ReadFileRequest>(json!({})).is_err());
+        let back: ReadFileRequest =
+            serde_json::from_value(serde_json::to_value(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+        let resp = ReadFileResponse {
+            content: "hi".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&resp).unwrap(),
+            json!({"content": "hi"})
+        );
+        let w: WriteFileRequest =
+            serde_json::from_value(json!({"content": "c", "path": "p"})).unwrap();
+        assert_eq!(w.content, "c");
+        assert_eq!(w.path, "p");
+        assert!(serde_json::from_value::<WriteFileRequest>(json!({"path": "p"})).is_err());
+        assert_eq!(
+            serde_json::to_value(&WriteFileResponse {}).unwrap(),
+            json!({})
+        );
+        let _: WriteFileResponse = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(serde_json::to_value(&UploadResponse {}).unwrap(), json!({}));
+        let _: UploadResponse = serde_json::from_value(json!({})).unwrap();
     }
 
     #[test]
