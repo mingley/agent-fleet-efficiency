@@ -1,0 +1,7 @@
+{"t_ms": 0, "seq": 0, "source": "replay-smoke", "trace_version": 1, "type": "trace_header"}
+{"t_ms": 2, "seq": 1, "session": "smoke", "startup_source": [], "type": "session_start"}
+{"t_ms": 400, "seq": 2, "session": "smoke", "command": "true", "cwd": "", "env_delta": {}, "timeout_s": null, "is_interactive": false, "duration_ms": 113.0, "exit_code": 0, "stdout_bytes": 0, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 520, "seq": 3, "session": "smoke", "command": "echo hello-replay", "cwd": "", "env_delta": {}, "timeout_s": null, "is_interactive": false, "duration_ms": 114.0, "exit_code": 0, "stdout_bytes": 13, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 640, "seq": 4, "session": "smoke", "command": "echo $REPLAY_MARKER", "cwd": "", "env_delta": {"REPLAY_MARKER": "smoke-1"}, "timeout_s": null, "is_interactive": false, "duration_ms": 115.0, "exit_code": 0, "stdout_bytes": 8, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 760, "seq": 5, "session": "smoke", "command": "false", "cwd": "", "env_delta": {}, "timeout_s": null, "is_interactive": false, "duration_ms": 113.5, "exit_code": 1, "stdout_bytes": 0, "stderr_bytes": 0, "stdout_sha256": "", "type": "command"}
+{"t_ms": 880, "seq": 6, "session": "smoke", "type": "session_end"}

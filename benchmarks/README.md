@@ -81,6 +81,16 @@ observed outcome), `interrupt`, and `file_op` events.
 python3 benchmarks/scripts/validate_trace.py benchmarks/fixtures/sample-trace.jsonl
 ```
 
+Replay a trace against an executor and check exit-code fidelity:
+
+```sh
+uv run python benchmarks/scripts/replay_trace.py benchmarks/fixtures/replay-smoke.jsonl --variant swerex-local
+```
+
+Byte counts are recorded, not asserted; `false`-style nonzero exits
+pass when the trace expects them. Capturing real SWE-agent traces is
+still open (see `docs/p1-compat.md` Q7/Q8 for what to record).
+
 ## Optimized Python (P0.5)
 
 Build a second venv from the pinned SWE-ReX plus the experimental patch
