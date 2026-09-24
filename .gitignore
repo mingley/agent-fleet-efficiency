@@ -7,3 +7,4 @@ __pycache__/
 *.pyc
 .opt-src/
 .venv-opt/
+_vendor/
