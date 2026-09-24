@@ -2,3 +2,6 @@ target/
 .DS_Store
 *.profraw
 benchmark-results/
+.venv/
+__pycache__/
+*.pyc
