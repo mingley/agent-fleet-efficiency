@@ -86,6 +86,83 @@ pub struct SwerexceptionEnvelope {
     pub swerexception: ExceptionTransfer,
 }
 
+fn default_action_type_bash() -> String {
+    "bash".to_string()
+}
+
+fn default_action_type_bash_interrupt() -> String {
+    "bash_interrupt".to_string()
+}
+
+fn default_check() -> String {
+    "raise".to_string()
+}
+
+fn default_interrupt_timeout() -> f64 {
+    0.2
+}
+
+fn default_n_retry() -> i32 {
+    3
+}
+
+/// §3.3 `BashAction`: `command` (required), `session = "default"`,
+/// `timeout: float | None = None`, `is_interactive_command = False`,
+/// `is_interactive_quit = False`, `check = "raise"`, `error_msg = ""`,
+/// `expect = []`, `action_type = "bash"`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BashAction {
+    pub command: String,
+    #[serde(default = "default_session")]
+    pub session: String,
+    #[serde(default)]
+    pub timeout: Option<f64>,
+    #[serde(default)]
+    pub is_interactive_command: bool,
+    #[serde(default)]
+    pub is_interactive_quit: bool,
+    #[serde(default = "default_check")]
+    pub check: String,
+    #[serde(default)]
+    pub error_msg: String,
+    #[serde(default)]
+    pub expect: Vec<String>,
+    #[serde(default = "default_action_type_bash")]
+    pub action_type: String,
+}
+
+/// §3.5 `BashInterruptAction`: `session = "default"`, `timeout = 0.2`,
+/// `n_retry = 3`, `expect = []`, `action_type = "bash_interrupt"`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BashInterruptAction {
+    #[serde(default = "default_session")]
+    pub session: String,
+    #[serde(default = "default_interrupt_timeout")]
+    pub timeout: f64,
+    #[serde(default = "default_n_retry")]
+    pub n_retry: i32,
+    #[serde(default)]
+    pub expect: Vec<String>,
+    #[serde(default = "default_action_type_bash_interrupt")]
+    pub action_type: String,
+}
+
+/// §3.3 `BashObservation`: `output = ""`, `exit_code: int | None = None`,
+/// `failure_reason = ""`, `expect_string = ""`, `session_type = "bash"`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BashObservation {
+    #[serde(default)]
+    pub output: String,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub failure_reason: String,
+    #[serde(default)]
+    pub expect_string: String,
+    #[serde(default = "default_session_type")]
+    pub session_type: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +231,83 @@ mod tests {
         );
         assert_eq!(serde_json::to_value(&CloseResponse {}).unwrap(), json!({}));
         let _: CloseResponse = serde_json::from_value(json!({})).unwrap();
+    }
+
+    #[test]
+    fn bash_action_defaults_and_round_trip() {
+        let v: BashAction = serde_json::from_value(json!({"command": "echo hi"})).unwrap();
+        assert_eq!(v.command, "echo hi");
+        assert_eq!(v.session, "default");
+        assert_eq!(v.timeout, None);
+        assert!(!v.is_interactive_command);
+        assert!(!v.is_interactive_quit);
+        assert_eq!(v.check, "raise");
+        assert_eq!(v.error_msg, "");
+        assert!(v.expect.is_empty());
+        assert_eq!(v.action_type, "bash");
+        assert_eq!(
+            serde_json::to_value(&v).unwrap(),
+            json!({
+                "command": "echo hi",
+                "session": "default",
+                "timeout": null,
+                "is_interactive_command": false,
+                "is_interactive_quit": false,
+                "check": "raise",
+                "error_msg": "",
+                "expect": [],
+                "action_type": "bash",
+            })
+        );
+        // Explicit timeout survives the round trip.
+        let v: BashAction =
+            serde_json::from_value(json!({"command": "x", "timeout": 2.5})).unwrap();
+        assert_eq!(v.timeout, Some(2.5));
+        // command is required.
+        assert!(serde_json::from_value::<BashAction>(json!({})).is_err());
+    }
+
+    #[test]
+    fn bash_interrupt_action_defaults_and_round_trip() {
+        let v: BashInterruptAction = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(v.session, "default");
+        assert_eq!(v.timeout, 0.2);
+        assert_eq!(v.n_retry, 3);
+        assert!(v.expect.is_empty());
+        assert_eq!(v.action_type, "bash_interrupt");
+        let back: BashInterruptAction =
+            serde_json::from_value(serde_json::to_value(&v).unwrap()).unwrap();
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn bash_observation_defaults_and_round_trip() {
+        let v: BashObservation = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(v.output, "");
+        assert_eq!(v.exit_code, None);
+        assert_eq!(v.failure_reason, "");
+        assert_eq!(v.expect_string, "");
+        assert_eq!(v.session_type, "bash");
+        let full = BashObservation {
+            output: "hi\n".to_string(),
+            exit_code: Some(3),
+            failure_reason: String::new(),
+            expect_string: "SHELLPS1PREFIX".to_string(),
+            session_type: "bash".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&full).unwrap(),
+            json!({
+                "output": "hi\n",
+                "exit_code": 3,
+                "failure_reason": "",
+                "expect_string": "SHELLPS1PREFIX",
+                "session_type": "bash",
+            })
+        );
+        let back: BashObservation =
+            serde_json::from_value(json!({"output": "x", "exit_code": null})).unwrap();
+        assert_eq!(back.exit_code, None);
     }
 
     #[test]
