@@ -19,6 +19,20 @@ RUN apt-get update \
 
 # Exact pinned upstream baseline from benchmarks/pins.md.
 RUN pip install 'git+https://github.com/SWE-agent/SWE-ReX@5c995c365dfb1fd5bc56fda688be5d8538f9931f'
+# Upstream remote.py imports aiohttp but does not declare it.
+RUN pip install aiohttp
+
+# Optimized env: pinned source + P0.5 patch series in an isolated venv.
+# Patches: benchmarks/patches/swerex-p0.5/*.patch (see its README).
+COPY benchmarks/patches/ /opt/patches/
+RUN git init -q /opt/swerex-opt-src \
+    && git -C /opt/swerex-opt-src remote add origin https://github.com/SWE-agent/SWE-ReX.git \
+    && git -C /opt/swerex-opt-src fetch -q --depth 1 origin 5c995c365dfb1fd5bc56fda688be5d8538f9931f \
+    && git -C /opt/swerex-opt-src checkout -q 5c995c365dfb1fd5bc56fda688be5d8538f9931f \
+    && for p in /opt/patches/swerex-p0.5/*.patch; do git -C /opt/swerex-opt-src apply "$p"; done \
+    && python3 -m venv /opt/venv-opt \
+    && /opt/venv-opt/bin/pip install -q /opt/swerex-opt-src aiohttp \
+    && /opt/venv-opt/bin/python -c "import swerex; print('opt swerex ok')"
 
 # Harness scripts (record_host.py, run_workload_a.py, ...).
 COPY benchmarks/scripts/ /opt/harness/scripts/

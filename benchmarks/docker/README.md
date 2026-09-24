@@ -34,6 +34,28 @@ docker run --rm --platform linux/amd64 \
   python3 /opt/harness/scripts/record_host.py --out /results/host.docker.json
 ```
 
+The image carries two environments: the system python has the pinned
+upstream SWE-ReX, and `/opt/venv-opt` has the same pin plus the P0.5
+patch series from `benchmarks/patches/swerex-p0.5/`.
+
+## Full matrix
+
+`run-matrix.sh` builds the image and runs the whole comparison: workload
+A at full N with per-flag attribution arms, workload B full, and the
+server workload across interpreters. One directory per run:
+
+```sh
+benchmarks/docker/run-matrix.sh
+```
+
+Results land in `benchmark-results/matrix-<ts>/` with `manifest.jsonl`
+(mapping each arm to interpreter + flags) and `matrix.json` (platform,
+image, pin, container info). Overrides: `IMAGE`, `PLATFORM` (default
+`linux/arm64` for speed; use `linux/amd64` for fleet-arch headlines),
+`N_TINY` (default `1000`), `CONCURRENT` (default `100`),
+`N_TINY_SERVER` (default `50`), `UPLOAD_MIB` (default `10`). Keep the
+host otherwise idle while the matrix runs.
+
 ## Fleet-arch note
 
 Headline runs must match the target fleet architecture (`linux/amd64`). On
