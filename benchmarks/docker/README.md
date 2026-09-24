@@ -36,7 +36,13 @@ docker run --rm --platform linux/amd64 \
 
 The image carries two environments: the system python has the pinned
 upstream SWE-ReX, and `/opt/venv-opt` has the same pin plus the P0.5
-patch series from `benchmarks/patches/swerex-p0.5/`.
+patch series from `benchmarks/patches/swerex-p0.5/`. It also builds
+`agent-execd` for the target platform at `/opt/execd/agent-execd`
+(multi-stage rust builder, deps pinned by `Cargo.lock`).
+
+Linux gate rerun (N=200, linux/arm64): upstream tiny 117.73ms vs
+rust tiny 0.48ms, session create 364.65ms vs 2.20ms, all 0 failures
+(`benchmark-results/linux-gate/`, gitignored).
 
 ## Full matrix
 

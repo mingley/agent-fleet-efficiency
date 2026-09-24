@@ -6,6 +6,15 @@
 #
 # Pinned third-party revisions (see benchmarks/pins.md):
 #   SWE-ReX @ 5c995c365dfb1fd5bc56fda688be5d8538f9931f
+#
+# Stage 1: build agent-execd for the target platform (deps pinned by
+# Cargo.lock via --locked).
+FROM rust:1-slim-bookworm AS rust-builder
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+RUN cargo build --release --locked
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -41,6 +50,9 @@ RUN git init -q /opt/fixtures/demo-repo \
     && echo hello > README.md && mkdir -p src && echo 'print(1)' > src/a.py \
     && git add -A && GIT_AUTHOR_DATE='2026-01-01T00:00:00Z' GIT_COMMITTER_DATE='2026-01-01T00:00:00Z' git commit -qm init \
     && echo more >> README.md && git commit -qam second
+
+# Rust execution plane (P1 gate winner).
+COPY --from=rust-builder /build/target/release/agent-execd /opt/execd/agent-execd
 
 # Harness scripts (record_host.py, run_workload_a.py, ...).
 COPY benchmarks/scripts/ /opt/harness/scripts/
