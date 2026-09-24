@@ -53,3 +53,16 @@ uv run python benchmarks/scripts/run_workload_a.py --variant swerex-local --n-ti
 
 Variants: `swerex-local` (pinned upstream Python baseline), `direct`
 (one subprocess per command, no persistent session).
+
+## Workload B
+
+File and workspace operations (read/write at 4KiB/1MiB/100MiB, tarball
+unpack, local git clone, git worktree creation, reflink probe):
+
+```sh
+uv run python benchmarks/scripts/run_workload_b.py --variant swerex-local
+uv run python benchmarks/scripts/run_workload_b.py --variant direct --quick
+```
+
+`--quick` skips the 100MiB files and shrinks the unpack tree for a fast
+verification pass.
