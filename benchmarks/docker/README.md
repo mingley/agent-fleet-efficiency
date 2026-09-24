@@ -50,7 +50,11 @@ benchmarks/docker/run-matrix.sh
 
 Results land in `benchmark-results/matrix-<ts>/` with `manifest.jsonl`
 (mapping each arm to interpreter + flags) and `matrix.json` (platform,
-image, pin, container info). Overrides: `IMAGE`, `PLATFORM` (default
+image, pin, container info). Summarize any run with:
+
+```sh
+python3 benchmarks/scripts/summarize_matrix.py benchmark-results/matrix-<ts>/
+``` Overrides: `IMAGE`, `PLATFORM` (default
 `linux/arm64` for speed; use `linux/amd64` for fleet-arch headlines),
 `N_TINY` (default `1000`), `CONCURRENT` (default `100`),
 `N_TINY_SERVER` (default `50`), `UPLOAD_MIB` (default `10`). Keep the
