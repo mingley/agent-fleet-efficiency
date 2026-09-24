@@ -73,5 +73,8 @@ else
     uv venv "$VENV"
 fi
 uv pip install --python "$VENV/bin/python" "$SRC"
+# Upstream remote.py imports aiohttp but pyproject does not declare it;
+# the SERVER/REMOTE path needs it on both ends.
+uv pip install --python "$VENV/bin/python" aiohttp
 "$VENV/bin/python" -c "import swerex; print('swerex:', swerex.__file__)"
 echo "opt venv ready: $VENV"

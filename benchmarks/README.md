@@ -32,6 +32,7 @@ From a fresh shell in the project directory:
 ```sh
 uv venv
 uv pip install 'git+https://github.com/SWE-agent/SWE-ReX@5c995c365dfb1fd5bc56fda688be5d8538f9931f'
+uv pip install aiohttp  # upstream remote.py imports it but does not declare it; needed for server-path runs
 ```
 
 The SWE-ReX revision must match [pins.md](pins.md).
@@ -90,4 +91,20 @@ semantic deltas), then run any workload with that interpreter:
 benchmarks/scripts/build-opt-venv.sh
 SWEREX_OPT_SKIP_SYNTAX_CHECK=1 SWEREX_OPT_SINGLE_SUBMIT=1 SWEREX_OPT_NO_FIXED_SLEEP=1 \
   .venv-opt/bin/python benchmarks/scripts/run_workload_a.py --variant swerex-local
+```
+
+## Server workload (P0.5)
+
+Remote-path microbenchmark: starts a `swerex-remote` server subprocess,
+drives tiny remote commands plus one upload through it. Server and
+client interpreters are selectable independently; flags apply to both
+ends via the inherited environment.
+
+```sh
+.venv/bin/python benchmarks/scripts/run_workload_server.py --quick --label upstream
+.venv-opt/bin/python benchmarks/scripts/run_workload_server.py --quick --label opt-plain \
+  --server-python .venv-opt/bin/python
+SWEREX_OPT_REUSE_SESSION=1 SWEREX_OPT_BOUNDED_IDEMPOTENCY=1 SWEREX_OPT_STREAM_UPLOAD=1 \
+  .venv-opt/bin/python benchmarks/scripts/run_workload_server.py --quick --label opt-flags \
+  --server-python .venv-opt/bin/python
 ```

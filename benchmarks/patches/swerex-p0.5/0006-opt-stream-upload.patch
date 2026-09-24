@@ -1,0 +1,19 @@
+diff --git a/src/swerex/server.py b/src/swerex/server.py
+index 7b15d2d..48c8924 100755
+--- a/src/swerex/server.py
++++ b/src/swerex/server.py
+@@ -189,7 +189,13 @@
+         file_path = Path(temp_dir) / "temp_file_transfer"
+         try:
+             with open(file_path, "wb") as f:
+-                f.write(await file.read())
++                if os.environ.get("SWEREX_OPT_STREAM_UPLOAD") == "1":
++                    # P0.5: stream the upload to disk in chunks instead of
++                    # reading the whole file into memory first.
++                    while chunk := await file.read(1024 * 1024):
++                        f.write(chunk)
++                else:
++                    f.write(await file.read())
+         finally:
+             await file.close()
+         if unzip:

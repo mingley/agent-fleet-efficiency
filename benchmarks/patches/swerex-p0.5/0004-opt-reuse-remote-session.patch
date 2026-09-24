@@ -1,0 +1,92 @@
+diff --git a/src/swerex/runtime/remote.py b/src/swerex/runtime/remote.py
+index 3177423..f322100 100644
+--- a/src/swerex/runtime/remote.py
++++ b/src/swerex/runtime/remote.py
+@@ -1,11 +1,14 @@
+ import asyncio
+ import logging
++import os
+ import random
+ import shutil
+ import sys
+ import tempfile
+ import traceback
+ import uuid
++from collections.abc import AsyncIterator
++from contextlib import asynccontextmanager
+ from pathlib import Path
+ from typing import Any
+ 
+@@ -55,6 +58,9 @@
+         """
+         self._config = RemoteRuntimeConfig(**kwargs)
+         self.logger = logger or get_logger("rex-runtime")
++        # P0.5: shared keep-alive session, used only when
++        # SWEREX_OPT_REUSE_SESSION=1 (closed by `close()`).
++        self._session: aiohttp.ClientSession | None = None
+         if not self._config.host.startswith("http"):
+             self.logger.warning("Host %s does not start with http, adding http://", self._config.host)
+             self._config.host = f"http://{self._config.host}"
+@@ -81,6 +87,22 @@
+             return self._config.host
+         return f"{self._config.host}:{self._config.port}"
+ 
++    @asynccontextmanager
++    async def _session_scope(self) -> AsyncIterator[aiohttp.ClientSession]:
++        """Yield the HTTP session for one request.
++
++        P0.5: with SWEREX_OPT_REUSE_SESSION=1 the runtime keeps a single
++        keep-alive session (closed with the runtime); otherwise each
++        request uses a fresh `force_close` session, exactly as upstream.
++        """
++        if os.environ.get("SWEREX_OPT_REUSE_SESSION") == "1":
++            if self._session is None or self._session.closed:
++                self._session = aiohttp.ClientSession()
++            yield self._session
++        else:
++            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(force_close=True)) as session:
++                yield session
++
+     def _handle_transfer_exception(self, exc_transfer: _ExceptionTransfer) -> None:
+         """Reraise exceptions that were thrown on the remote."""
+         if exc_transfer.traceback:
+@@ -132,7 +154,7 @@
+         together with the message.
+         """
+         try:
+-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(force_close=True)) as session:
++            async with self._session_scope() as session:
+                 timeout_value = self._get_timeout(timeout)
+                 async with session.get(
+                     f"{self._api_url}/is_alive",
+@@ -176,7 +198,7 @@
+ 
+         while retry_count <= num_retries:
+             try:
+-                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(force_close=True)) as session:
++                async with self._session_scope() as session:
+                     async with session.post(
+                         request_url,
+                         json=payload.model_dump() if payload else None,
+@@ -225,7 +247,7 @@
+         source = Path(request.source_path).resolve()
+         self.logger.debug("Uploading file from %s to %s", request.source_path, request.target_path)
+ 
+-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(force_close=True)) as session:
++        async with self._session_scope() as session:
+             if source.is_dir():
+                 # Ignore cleanup errors: See https://github.com/SWE-agent/SWE-agent/issues/1005
+                 with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+@@ -262,4 +284,11 @@
+ 
+     async def close(self) -> CloseResponse:
+         """Closes the runtime."""
+-        return await self._request("close", None, CloseResponse)
++        try:
++            return await self._request("close", None, CloseResponse)
++        finally:
++            # P0.5: release the shared keep-alive session (no-op upstream:
++            # without SWEREX_OPT_REUSE_SESSION=1 this is always None).
++            if self._session is not None:
++                await self._session.close()
++                self._session = None
