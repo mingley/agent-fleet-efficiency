@@ -26,9 +26,12 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 const PTY_ROWS: u16 = 24;
-/// Wide default so long lines do not wrap (wrapped lines would inject
-/// extra newlines into captured output).
-const PTY_COLS: u16 = 200;
+/// Upstream parity: pexpect/ptyprocess default `dimensions=(24, 80)`
+/// (`PtyProcess.spawn`). Width-sensitive tools (`ls`, `ps`, ...) format
+/// identically. The kernel tty layer never injects wrap newlines into the
+/// captured byte stream (wrapping is terminal-emulator behavior), so 80
+/// columns cost nothing for long-line capture.
+const PTY_COLS: u16 = 80;
 /// Bound on the `EXITCODEEND` suffix wait (upstream: 1 s).
 const EXIT_SUFFIX_TIMEOUT: Duration = Duration::from_secs(1);
 /// Bound on re-syncing to the prompt after the exit marker (upstream: 0.1 s;
