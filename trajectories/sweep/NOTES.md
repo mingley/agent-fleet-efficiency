@@ -41,11 +41,14 @@ empty diff on both arms — still a valid error-path parity signal.
 
 ## Results (control vs treatment)
 
-7/8 byte-identical histories; all 8 `submitted` both arms, all 8 identical
-submissions. Sole divergence: `function_calling_replace_from_source`
-history[7] (a `pip install -e` observation): spinner frames, wheel sha256 /
-`/tmp/pip-ephem-wheel-cache-*` names (nondeterministic per build — the
-control repeat differs from control at the same index), plus
+Compared with `benchmarks/scripts/compare_trajs.py` at trajectory level
+(real observations; replay-output `history` holds only unrendered
+`{observation}` templates). 6/8 pairs fully identical; all 8 `submitted`
+both arms, all 8 identical submissions. The 2 diverging pairs (both
+`*install_from_source`) differ only at the `pip install -e` observation
+(`trajectory[2]`): spinner frames, wheel sha256 /
+`/tmp/pip-ephem-wheel-cache-*` names (nondeterministic per build — a
+control repeat differs from control at the same index in both cases), plus
 typing-extensions/pygments "already satisfied" (control image) vs downloaded
 (treatment image layer lacks the SWE-ReX Python deps; same versions either
 way). Not an agent-execd gap; no code changes made.

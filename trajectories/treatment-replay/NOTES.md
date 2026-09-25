@@ -40,8 +40,10 @@ docker stop agent-execd-replay
 
 - Output: `trajectories/treatment-replay/marshmallow-code__marshmallow-1867/marshmallow-code__marshmallow-1867.traj`
 - exit_status `submitted`; history 24/24 items byte-identical to control
-  (11 actions + all observations); `submission` and `edited_files*`
-  identical.
+  (11 actions; observation turns are unrendered templates in replay
+  output — real observations compared at trajectory level: 11/11 steps
+  identical, incl. repro `344` → fix → `345`); `submission` and
+  `edited_files*` identical. See `compare_trajs.py`.
 - Wall time: 7.64 s vs control 12.65 s (first-hand `/usr/bin/time -p`
   re-runs, fresh containers, idle host; N=1 each — direction only).
 - One compat fix was required before parity: PTY width 200 → 80 columns
