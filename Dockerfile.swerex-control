@@ -1,0 +1,12 @@
+# Control-arm image: UPSTREAM SWE-ReX server (vendored _vendor/SWE-ReX, v1.4.0)
+# with the local runtime. Runs as root (like the SWE-bench docker images) so
+# that SWE-agent's /root/tools installs and /testbed repo reset work unchanged.
+# The marshmallow checkout is bind-mounted at /testbed at `docker run` time.
+FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends git bash \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory /testbed
+COPY _vendor/SWE-ReX /opt/SWE-ReX
+RUN pip install --no-cache-dir /opt/SWE-ReX
+WORKDIR /testbed
+EXPOSE 8471

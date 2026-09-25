@@ -1,0 +1,20 @@
+# Treatment-arm image: agent-execd (our Rust SWE-ReX-compatible server) on the
+# same runtime base as the control image (python:3.11-slim + git/bash), so the
+# replayed python/git commands inside the container see an identical userspace.
+# The marshmallow checkout is bind-mounted at /testbed at `docker run` time.
+# Build (small tar context, avoids the 2GB workspace target/ + _vendor/ dirs):
+#   tar cf - Dockerfile.agent-execd-replay Cargo.toml Cargo.lock crates \
+#     | docker build -f Dockerfile.agent-execd-replay -t agent-execd-replay:latest -
+FROM rust:1-bookworm AS builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo build --release --locked
+
+FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends git bash \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory /testbed
+COPY --from=builder /app/target/release/agent-execd /usr/local/bin/agent-execd
+WORKDIR /testbed
+EXPOSE 8472
