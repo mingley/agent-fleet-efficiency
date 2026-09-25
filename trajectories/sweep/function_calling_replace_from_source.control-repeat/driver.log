@@ -1,0 +1,54 @@
+exit=0
+--- stdout ---
+                                      
+            submit                                                              
+🧰 DEBUG    Retrieved state from environment: {'open_file':                     
+            '/testbed/src/marshmallow/fields.py', 'working_dir': '/testbed'}    
+🤠 INFO     Found submission: diff --git a/src/marshmallow/fields.py            
+            b/src/marshmallow/fields.py                                         
+            index ad388c75..168a8452 100644                                     
+            --- a/src/marshmallow/fields.py                                     
+            +++ b/src/marshmallow/fields.py                                     
+            @@ -1472,7 +1472,8 @@ class TimeDelta(Field):                       
+                     if value is None:                                          
+                         return None                                            
+                     base_unit = dt.timedelta(**{self.precision: 1})            
+            -        return int(value.total_seconds() /                         
+            base_unit.total_seconds())                                          
+            +        # round to nearest int                                     
+            +        return int(round(value.total_seconds() /                   
+            base_unit.total_seconds()))                                         
+                                                                                
+                 def _deserialize(self, value, attr, data, **kwargs):           
+                     try:                                                       
+                                                                                
+🤠 INFO     🤖 MODEL INPUT                                                      
+            diff --git a/src/marshmallow/fields.py b/src/marshmallow/fields.py  
+            index ad388c75..168a8452 100644                                     
+            --- a/src/marshmallow/fields.py                                     
+            +++ b/src/marshmallow/fields.py                                     
+            @@ -1472,7 +1472,8 @@ class TimeDelta(Field):                       
+                     if value is None:                                          
+                         return None                                            
+                     base_unit = dt.timedelta(**{self.precision: 1})            
+            -        return int(value.total_seconds() /                         
+            base_unit.total_seconds())                                          
+            +        # round to nearest int                                     
+            +        return int(round(value.total_seconds() /                   
+            base_unit.total_seconds()))                                         
+                                                                                
+                 def _deserialize(self, value, attr, data, **kwargs):           
+                     try:                                                       
+                                                                                
+            (Open file: /testbed/src/marshmallow/fields.py)                     
+            (Current directory: /testbed)                                       
+            bash-$                                                              
+🤠 INFO     Trajectory saved to                                                 
+            trajectories/sweep/function_calling_replace_from_source.control-repe
+            at/marshmallow-code__marshmallow-1867/marshmallow-code__marshmallow-
+            1867.traj                                                           
+🏃 INFO     Done                                                                
+🪴 INFO     Beginning environment shutdown...                                   
+🦖 DEBUG    Ensuring deployment is stopped because object is deleted            
+
+--- stderr ---

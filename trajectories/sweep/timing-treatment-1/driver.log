@@ -1,0 +1,57 @@
+exit=0
+--- stdout ---
+                                              
+            🎬 ACTION                                                           
+            rm reproduce.py                                                     
+🧰 DEBUG    Retrieved state from environment: {'open_file':                     
+            '/testbed/src/marshmallow/fields.py', 'working_dir': '/testbed'}    
+🤠 INFO     🤖 MODEL INPUT                                                      
+            Your command ran successfully and did not produce any output.       
+            (Open file: {open_file})                                            
+            (Current directory: {working_dir})                                  
+            bash-$                                                              
+🤠 INFO     ========================= STEP 11 =========================         
+🤠 INFO     💭 THOUGHT                                                          
+            rm doesn't have any output when it deletes successfully, so that    
+            must have worked. Now that we have fixed the issue, we should submit
+            our changes to the code base. Let's submit the changes using the    
+            `submit` command.                                                   
+                                                                                
+                                                                                
+            🎬 ACTION                                                           
+            submit                                                              
+🧰 DEBUG    Retrieved state from environment: {'open_file':                     
+            '/testbed/src/marshmallow/fields.py', 'working_dir': '/testbed'}    
+🤠 INFO     Found submission: diff --git a/src/marshmallow/fields.py            
+            b/src/marshmallow/fields.py                                         
+            index ad388c75..20da7684 100644                                     
+            --- a/src/marshmallow/fields.py                                     
+            +++ b/src/marshmallow/fields.py                                     
+            @@ -1472,7 +1472,7 @@ class TimeDelta(Field):                       
+                     if value is None:                                          
+                         return None                                            
+                     base_unit = dt.timedelta(**{self.precision: 1})            
+            -        return int(value.total_seconds() /                         
+            base_unit.total_seconds())                                          
+            +        return int(round(value.total_seconds() /                   
+            base_unit.total_seconds()))  # round to nearest int                 
+                                                                                
+                 def _deserialize(self, value, attr, data, **kwargs):           
+                     try:                                                       
+                                                                                
+🤠 INFO     🤖 MODEL INPUT                                                      
+            {observation}                                                       
+            (Open file: {open_file})                                            
+            (Current directory: {working_dir})                                  
+            bash-$                                                              
+🤠 INFO     Trajectory saved to                                                 
+            trajectories/sweep/timing-treatment-1/marshmallow-code__marshmallow-
+            1867/marshmallow-code__marshmallow-1867.traj                        
+🏃 INFO     Done                                                                
+🪴 INFO     Beginning environment shutdown...                                   
+🦖 DEBUG    Ensuring deployment is stopped because object is deleted            
+
+--- stderr ---
+real 6.50
+user 1.61
+sys 0.35

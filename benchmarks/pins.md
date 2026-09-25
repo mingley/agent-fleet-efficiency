@@ -13,4 +13,4 @@ Install the baseline with:
 pip install 'git+https://github.com/SWE-agent/SWE-ReX@5c995c365dfb1fd5bc56fda688be5d8538f9931f'
 ```
 
-Still to pin: SWE-agent revision for workload-D trace replay.
+| SWE-agent (`https://github.com/SWE-agent/SWE-agent`) | `3ea751c087f32b16e039a2233dd6eefecef325d5` (main, 2026-09-25) | Workload-D trace replay driver (v1.1.0) |
